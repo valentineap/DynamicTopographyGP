@@ -1,5 +1,6 @@
 high_accuracy_spot/*
 all_spot/*
 spot_shiptrack/*
+figures/*
 *.pyc
 __pycache__/*
