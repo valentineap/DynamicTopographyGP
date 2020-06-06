@@ -1,0 +1,3 @@
+[submodule "Davies_etal_NGeo_2019_Datasets"]
+	path = Davies_etal_NGeo_2019_Datasets
+	url = https://github.com/drhodrid/Davies_etal_NGeo_2019_Datasets.git
