@@ -4,8 +4,9 @@ import scipy.special as spec
 import scipy.integrate as integ
 import scipy.optimize as optim
 import scipy.linalg as slinalg
-import tqdm
+
 import time
+import datetime
 
 ########################################
 ## Andrew Valentine                   ##
@@ -95,7 +96,7 @@ def logLikelihood(dists,data,stds,params):
     return -0.5*(N*np.log(2*np.pi)+detC + data.dot(np.linalg.solve(C,data)))
 
 def loadOptimalParams(file):
-    '''Read hyperparameter file'''
+    '''Read hyperparameter file and return the vector of hyperparameters'''
     with open(file,'rb') as fp:
         opt_out = pickle.load(fp)
     return opt_out.x
@@ -123,8 +124,6 @@ def loadSpectrum(file):
 def Il(l,optimal_params):
     leg = spec.legendre(l)
     return integ.quad(lambda u:matern_full(np.arccos(u),optimal_params)*leg(u),-1,1)
-#flm = lambda m,l,th, ph,params: 2*np.pi*Il(l,params)[0]*real_sph_harm(m,l,th,ph,radians=False)#Nl = 1 given definition of spherical harmonics
-#glm = lambda m,l,params:2*np.pi*Il(l,params)[0]
 
 def flm_arr_gl(l,theta,phi,params,radians=False):
     out = np.zeros([theta.shape[0],2*l+1])
@@ -132,6 +131,21 @@ def flm_arr_gl(l,theta,phi,params,radians=False):
     for m in range(-l,l+1):
         out[:,m+l] = 2*np.pi*integral[0]*real_sph_harm(m,l,theta,phi,radians)
     return out,2*np.pi*integral[0]
+
+def loadData(datafile, dataset_type):
+    '''
+    Load data from datafile, selecting portion appropriate to dataset_type
+    '''
+    data = np.loadtxt(datafile)
+    if dataset_type == 'high_accuracy_spot':
+        data = data[:N_HIGH_ACCURACY,:] # Select only the high accuracy points
+    elif dataset_type == 'all_spot':
+        data = data[:N_SPOT,:] # Select all spot points
+    elif dataset_type == 'spot_shiptrack':
+        pass
+    else:
+        raise ValueError("Unrecognised dataset type")
+    return data, data.shape[0]
 
 def determineOptimalParams(dataset_type,datafile,outfile,determine_err_correction=False):
     '''
@@ -142,66 +156,58 @@ def determineOptimalParams(dataset_type,datafile,outfile,determine_err_correctio
     datafile - Path to residual topography dataset
     outfile - Path to file for output
     determine_err_correction - True/False, determine correction to uncertainty for points without crustal information
-    '''
-    print("Loading file...")
-    data = np.loadtxt(datafile)
-    if dataset_type == 'high_accuracy_spot':
-        data = data[:N_HIGH_ACCURACY,:] # Select only the high accuracy points
-    elif dataset_type == 'all_spot':
-        data = data[:N_SPOT,:] # Select all spot points
-        if determine_err_correction: data[N_HIGH_ACCURACY:,3]-=0.2 # Undo the hard-coded correction
-    elif dataset_type == 'spot_shiptrack':
-        if determine_err_correction: data[N_HIGH_ACCURACY:,3]-=0.2 # Undo the hard-coded correction
-    else:
-        raise ValueError("Unrecognised dataset type")
-    print("...done!\n")
-    ndata = data.shape[0]
-    print("Computing distances...")
-    dists = np.zeros([ndata,ndata])
-    for i in tqdm.tqdm(range(ndata)):
-        dists[:,i] = dist(data[i,0],data[i,1],data[:,0],data[:,1])
-    print("...done!\n")
 
-    if determine_err_correction and dataset_type!='high_accuracy_spot': #No error correction to determine for high accuracy spot data
+    Returns:
+    array, optimal parameter vector
+    '''
+    print("- Determining optimal hyperparameters")
+    data,ndata = loadData(datafile,dataset_type)
+    dists = np.zeros([ndata,ndata])
+    for i in range(ndata):
+        dists[:,i] = dist(data[i,0],data[i,1],data[:,0],data[:,1])
+    value = 0
+    noptit = 0
+    if determine_err_correction and dataset_type!='high_accuracy_spot':
+        data[N_HIGH_ACCURACY:,3] -= 0.2 # Undo the hard-coded correction
         # We solve for five hyperparameters: (matern amplitude, matern lengthscale, matern order, dataset mean, correction to uncertainties)
         def opfunc(p,dataset):
+            nonlocal value,noptit
             value = -logLikelihood(dists,dataset[:,2]-p[3],np.where(np.arange(dataset.shape[0])<N_HIGH_ACCURACY,dataset[:,3],dataset[:,3]+p[4]),p[0:3])
-            #print(p,value)
             return value
-
-        print("Determinining optimal parameters...")
-        fmin_out = optim.minimize(opfunc,np.array([0.6,0.2,0.5,0.,0.1])
-                                     ,args=(data,)
-                                     ,bounds=[(0.05,None),(0.01,3.0),(0.01,10),(None,None),(0.,None)]
-                                     ,options={'iprint':101})
-        print("...done!\n")
-        print("Determined parameters:")
-        print("     mu = %.5f"%fmin_out.x[3])
-        print("  sigma = %.5f"%fmin_out.x[0])
-        print("    rho = %.5f"%fmin_out.x[1])
-        print("      v = %.5f"%fmin_out.x[2])
-        print(" Eshift = %.5f"%fmin_out.x[4])
+        p0 = np.array([0.5,0.2,0.5,0.,0.1])
+        bounds = [(0.05,None),(0.01,3.0),(0.01,10),(None,None),(0.,None)]
     else:
         # We solve for four hyperparameters: (matern amplitude, matern lengthscale, matern order, dataset mean)
         def opfunc(p,dataset):
+            nonlocal value,noptit
             value = -logLikelihood(dists,dataset[:,2]-p[3],dataset[:,3],p[0:3])
-            #print(p,value)
             return value
+        p0 = np.array([0.5,0.2,0.5,0.])
+        bounds = [(0.05,None),(0.01,3.0),(0.01,10),(None,None)]
+    def callback(p):
+        nonlocal value,noptit
+        noptit+=1
+        if p.shape[0] == 4:
+            print("      At iter %3i: p = [%6.3f %6.3f %6.3f %6.3f], v=%.3f"%(noptit,*p,value))
+        else:
+            print("      At iter %3i: p = [%6.3f %6.3f %6.3f %6.3f %6.3f], v=%.3f"%(noptit,*p,value))
 
-        print("Determinining optimal parameters...")
-        fmin_out = optim.minimize(opfunc,np.array([0.5,0.2,0.5,0.])
-                                     ,args=(data,)
-                                     ,bounds=[(0.05,None),(0.01,3.0),(0.01,10),(None,None)]
-                                     ,options={'iprint':101})
-        print("...done!\n")
-        print("Determined parameters:")
-        print("     mu = %.5f"%fmin_out.x[3])
-        print("  sigma = %.5f"%fmin_out.x[0])
-        print("    rho = %.5f"%fmin_out.x[1])
-        print("      v = %.5f"%fmin_out.x[2])
+    print("    Running LBFGS-B; this may take some time...")
+    starttime = time.time()
+    processtime = time.process_time()
+    fmin_out = optim.minimize(opfunc,p0,args=(data,),bounds=bounds,options={'iprint':-1},callback=callback,method='L-BFGS-B')
+    duration = time.time() - starttime
+    processduration = time.process_time() - processtime
+    # Write out result before checking exit status so that we can raise an error but preserve information
     with open(outfile,'wb') as fp:
         pickle.dump(fmin_out,fp)
-    print("Output stored in: %s"%outfile)
+    if fmin_out.success:
+        print('    LBFGS-B completed successfully: %s'%fmin_out.message)
+        print('    Time required: %s (efficiency: %i%%)'%(str(datetime.timedelta(seconds=int(duration))),int(100*processduration/duration)))
+    else:
+        print('    LBFGS-B failed: %s'%fmin_out.message)
+        raise ValueError
+    return fmin_out.x
 
 def obtainInverse(dataset_type,datafile,paramfile, outfile):
     '''
@@ -213,43 +219,31 @@ def obtainInverse(dataset_type,datafile,paramfile, outfile):
     datafile - Path to residual topography dataset
     paramfile - File containing hyperparameters
     outfile - File to store inverse covariance matrix
-    '''
-    print("Loading files...")
-    data = np.loadtxt(datafile)
-    if dataset_type == 'high_accuracy_spot':
-        data = data[:N_HIGH_ACCURACY,:]
-    elif dataset_type == 'all_spot':
-        data = data[:N_SPOT,:]
-    elif dataset_type == 'spot_shiptrack':
-        pass
-    else:
-        raise ValueError("Unrecognised dataset type")
-    ndata = data.shape[0]
-    opt_out=loadOptimalParams(paramfile)
-    print("...done!\n")
 
+    Returns:
+    array, inverse covariance matrix
+    '''
+    print("- Constructing inverse covariance matrix for Gaussian Process")
+    data,ndata = loadData(datafile,dataset_type)
+    opt_out=loadOptimalParams(paramfile)
     optimal_params = opt_out[0:3]
     data[:,2] -= opt_out[3]
-    if len(opt_out)==5: # Params include error correction
-        print("Revised shiptrack error correction: %.3f"%opt_out[4])
-        data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2 # Apply new correction instead of hard-coded.
-    print("Computing distances...")
+    if len(opt_out)==5: data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2 # Apply new correction instead of hard-coded.
     dists = np.zeros([ndata,ndata])
-    for i in tqdm.tqdm(range(ndata)):
+    for i in range(ndata):
         dists[:,i] = dist(data[i,0],data[i,1],data[:,0],data[:,1])
-    print("...done!\n")
-
-    print("Building covariance matrix...")
     C = matern_full(dists,optimal_params)+np.diag(data[:,3]**2)
-    print("...done!\n")
     del( dists) #Save a bit of space
-
+    print("    Inverting %i x %i matrix; this may take some time..."%(ndata,ndata))
+    starttime = time.time()
+    processtime = time.process_time()
     iC = np.linalg.inv(C)
-
-
-
+    duration = time.time() - starttime
+    processduration = time.process_time() - processtime
+    print('    Inverse found. Time required: %s (efficiency: %i%%)'%(str(datetime.timedelta(seconds=int(duration))),int(100*processduration/duration)))
     with open(outfile,'wb') as fp:
         pickle.dump(iC,fp)
+    return iC
 
 def obtainSpectrum(dataset_type,datafile,paramfile,outfile,Lmax):
     '''
@@ -263,34 +257,17 @@ def obtainSpectrum(dataset_type,datafile,paramfile,outfile,Lmax):
     outfile - File to store spherical harmonic coefficients
     Lmax - maximum spherical harmonic degree to compute
     '''
-    print("Loading files...")
-    data = np.loadtxt(datafile)
-    if dataset_type == 'high_accuracy_spot':
-        data = data[:N_HIGH_ACCURACY,:]
-    elif dataset_type == 'all_spot':
-        data = data[:N_SPOT,:]
-    elif dataset_type == 'spot_shiptrack':
-        pass
-    else:
-        raise ValueError("Unrecognised dataset type")
-    ndata = data.shape[0]
+    print("- Expanding Gaussian Process in terms of spherical harmonics")
+    data,ndata = loadData(datafile,dataset_type)
     opt_out = loadOptimalParams(paramfile)
-    print("...done!\n")
 
     optimal_params = opt_out[0:3]
     data[:,2] -= opt_out[3]
-    if len(opt_out)==5:
-        print("Revised shiptrack error correction: %.3f"%opt_out[4])
-        data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
-    print("Computing distances...")
+    if len(opt_out)==5: data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
     dists = np.zeros([ndata,ndata])
-    for i in tqdm.tqdm(range(ndata)):
+    for i in range(ndata):
         dists[:,i] = dist(data[i,0],data[i,1],data[:,0],data[:,1])
-    print("...done!\n")
-
-    print("Building covariance matrix...")
     C = matern_full(dists,optimal_params)+np.diag(data[:,3]**2)
-    print("...done!\n")
     del( dists) #Save a bit of space
     ncomp = (Lmax+1)**2
     ll = np.zeros(ncomp,dtype='int')
@@ -301,7 +278,6 @@ def obtainSpectrum(dataset_type,datafile,paramfile,outfile,Lmax):
             ll[i] = l
             mm[i] = m
             i+=1
-    print("Computing Legendre expansion...")
     flms = np.zeros([ndata,ncomp])
     gls = np.zeros([Lmax+1])
     i = 0
@@ -309,22 +285,33 @@ def obtainSpectrum(dataset_type,datafile,paramfile,outfile,Lmax):
         flms[:,i:i+(2*l)+1],gls[l] = flm_arr_gl(l,data[:,1],data[:,0],optimal_params)
         i+=(2*l)+1
     flms[:,0] = data[:,2]
-    print("...done!\n")
-
-    print("Solving linear system...")
-
-    t = time.time()
+    print("    Solving linear system; this may take some time...")
+    starttime = time.time()
+    processtime = time.process_time()
     sol = slinalg.solve(C,flms,assume_a='pos')
-    solvetime = time.time()-t
-    print("...done!\n")
+    duration = time.time() - starttime
+    processduration = time.process_time() - processtime
+    print('    Solution found. Time required: %s (efficiency: %i%%)'%(str(datetime.timedelta(seconds=int(duration))),int(100*processduration/duration)))
     coeff = flms[:,1:].T.dot(sol)
+    Sigma = np.diag([gls[l] for l in ll[1:]])-coeff[:,1:]
     with open(outfile,'wb') as fp:
         pickle.dump(coeff[:,0],fp)
-        pickle.dump(np.diag([gls[l] for l in ll[1:]])-coeff[:,1:],fp)
-        pickle.dump(solvetime,fp)
+        pickle.dump(Sigma,fp)
+    return coeff[:,0],Sigma
 
 
 def interp(lat,lon,dataset,iK,optimal_params):
+    '''Evaluate GP interpolation at point (lat,lon)
+
+    Inputs
+    lat, lon -- coordinates of point of interest
+    dataset -- array, dimension[N,4], observations
+    iK -- inverse covariance matrix
+    optimal_params -- parameter vector
+
+    Returns
+    float, float -- the mean and *variance* at each point
+    '''
     k = matern_full(dist(lat,lon,dataset[:,0],dataset[:,1]),optimal_params)
     return k.dot(iK).dot(dataset[:,2]),optimal_params[0]**2 - k.dot(iK).dot(k)
 
@@ -340,36 +327,21 @@ def calculateMapData(dataset_type,datafile,paramfile,covfile,outfile,nlats=90,nl
     outfile - File to store map data
     nlats,nlons - Number of latitude/longitude points to compute
     '''
-    print("Loading files...")
-    data = np.loadtxt(datafile)
-    if dataset_type == 'high_accuracy_spot':
-        data = data[:N_HIGH_ACCURACY,:]
-    elif dataset_type == 'all_spot':
-        data = data[:N_SPOT,:]
-    elif dataset_type == 'spot_shiptrack':
-        pass
-    else:
-        raise ValueError("Unrecognised dataset type")
+    print("- Evaluating Gaussian Process on regular grid")
+    data,ndata = loadData(datafile,dataset_type)
     opt_out = loadOptimalParams(paramfile)
     optimalParams = opt_out[0:3]
     data[:,2] -= opt_out[3]
-    if len(opt_out)==5:
-        print("Revised shiptrack error correction: %.3f"%opt_out[4])
-        data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
+    if len(opt_out)==5: data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
     with open(covfile,'rb') as fp:
         iK = pickle.load(fp)
-    print("...done!")
     lats = np.linspace(-90,90,nlats)
     lons = np.linspace(-180,180,nlons)
     mean = np.zeros([nlats,nlons])
     variance = np.zeros([nlats,nlons])
-
-    t = tqdm.tqdm(total=nlats*nlons)
     for i,lat in enumerate(lats):
         for j,lon in enumerate(lons):
             mean[i,j],variance[i,j] = interp(lat,lon,data,iK,optimalParams)
-            t.update(1)
-    t.close()
     dkl = 0.5 * (mean**2/optimalParams[0]**2 + variance/optimalParams[0]**2 - np.log(variance/optimalParams[0]**2)-1)
     with open(outfile,'wb') as fp:
         pickle.dump(mean,fp)
@@ -377,6 +349,7 @@ def calculateMapData(dataset_type,datafile,paramfile,covfile,outfile,nlats=90,nl
         pickle.dump(dkl,fp)
         pickle.dump(lats,fp)
         pickle.dump(lons,fp)
+    return mean,variance,dkl,lats,lons
 def calculateWhereToSample(dataset_type,datafile,paramfile,covfile,sphfile,mapdatafile,outfile_mask,llist=[2,5,10,15,20,30],obsErr=0.1):
     '''
     Evaluate GP interpolation on regular grid to allow generation of a map.
@@ -392,31 +365,15 @@ def calculateWhereToSample(dataset_type,datafile,paramfile,covfile,sphfile,mapda
     llist - List of spherical harmonic degrees of interest
     obsErr - Assumed standard error in putative observation
     '''
-    print("Loading files...")
-    data = np.loadtxt(datafile)
-    if dataset_type == 'high_accuracy_spot':
-        data = data[:N_HIGH_ACCURACY,:]
-    elif dataset_type == 'all_spot':
-        data = data[:N_SPOT,:]
-    elif dataset_type == 'spot_shiptrack':
-        pass
-    else:
-        raise ValueError("Unrecognised dataset type")
+    print("- Determining value of additional samples")
+    data,ndata = loadData(datafile,dataset_type)
     opt_out = loadOptimalParams(paramfile)
     optimalParams = opt_out[0:3]
     data[:,2] -= opt_out[3]
-    if len(opt_out)==5:
-        print("Revised shiptrack error correction: %.3f"%opt_out[4])
-        data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
-    ndata = data.shape[0]
-
-    print("Loading spherical harmonic distribution...")
+    if len(opt_out)==5: data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
     with open(sphfile,'rb') as fp:
         yFull = pickle.load(fp)
         SigmaFull = pickle.load(fp)
-    print("...done!\n")
-
-    print("Loading map data...")
     with open(mapdatafile,'rb') as fp:
         mean = pickle.load(fp)
         variance = pickle.load(fp)
@@ -425,12 +382,8 @@ def calculateWhereToSample(dataset_type,datafile,paramfile,covfile,sphfile,mapda
         lons = pickle.load(fp)
     nlats = lats.shape[0]
     nlons = lons.shape[0]
-    print("...done!\n")
-    print("Loading inverse matrix...")
     with open(covfile,'rb') as fp:
         Q = pickle.load(fp)
-    print("...done!")
-    t = tqdm.tqdm(total=nlats*nlons*len(llist))
     for l in llist:
         integral = 2*np.pi*Il(l,optimalParams)[0]
         il = sum([2*ll+1 for ll in range(1,l)])
@@ -443,10 +396,7 @@ def calculateWhereToSample(dataset_type,datafile,paramfile,covfile,sphfile,mapda
             F[:,i] = fl(data[i,0],data[i,1])
         FQ = F.dot(Q)
         zl = lambda lat, lon: fl(lat,lon)-FQ.dot(matern_full(dist(lat,lon,data[:,0],data[:,1]),optimalParams))
-
-
         dkl_min = np.zeros_like(dkl)
-
         for i,lat in enumerate(lats):
             for j,lon in enumerate(lons):
                 alpha = 1/(variance[i,j]+obsErr**2)
@@ -458,8 +408,6 @@ def calculateWhereToSample(dataset_type,datafile,paramfile,covfile,sphfile,mapda
                 if sgnSigma<0 or sgnSigmaP<0: raise ValueError('Negative determinant?')
                 dkl_min[i,j] = 0.5*(np.trace(invSigmaP.dot(Sigma))-(2*l+1) +(ldSigmaP-ldSigma))
                 dkl[i,j] = dkl_min[i,j]+0.5*alpha**2 * variance[i,j]*z.dot(invSigmaP).dot(z)
-                t.update(1)
         with open(outfile_mask%l,'wb') as fp:
             pickle.dump(dkl_min,fp)
             pickle.dump(dkl,fp)
-    t.close()

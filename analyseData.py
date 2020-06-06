@@ -79,3 +79,4 @@ if userSettings.DO_SPOT_SHIP:
     dynamicTopoGP.calculateMapData(subset,datafile,paramfile,covfile,mapdatafile)
 else:
     print("Analysis of spot and shiptrack data is switched off in userSettings.py")
+print("Analysis complete.")
