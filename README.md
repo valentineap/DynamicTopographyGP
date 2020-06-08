@@ -22,7 +22,7 @@ so that git does not track changes to this file. To turn tracking back on, use
 git update-index --no-skip-worktree userSettings.py
 ```
 Note that analysing the full dataset is computationally- and memory-intensive
-(~48 hours on a quad-core 3.2GHz Intel i5 with 16Gb RAM) and is turned off by
+(~36 hours on a quad-core 3.2GHz Intel i5 with 16Gb RAM) and is turned off by
 default. The plotting scripts are intended to be robust to missing subsets.
 
 The data analysed in this study is available at:
@@ -39,3 +39,8 @@ Overall these contain some redundancy -- e.g. the distance matrix is recomputed
 several times when a full analysis is performed -- but this enables one
 processing step to be rerun independently of the others if necessary. This has
 negligible effect on the overall runtime.
+
+Andrew Valentine
+Research School of Earth Sciences
+The Australian National University
+June 2020

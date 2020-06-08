@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import pickle
-from dynamicTopoGP import N_SPOT,N_HIGH_ACCURACY,loadOptimalParams,matern_full,loadSpectrum,modelToPower
+from dynamicTopoGP import N_SPOT,N_HIGH_ACCURACY,loadOptimalParams,matern_full,loadSpectrum,modelToPower,interp,real_sph_harm,loadData,dist
 import os
 import sys
 import userSettings
@@ -22,8 +22,12 @@ color_all_2 = 'salmon'
 color_spot_ship_1 = 'royalblue'
 color_spot_ship_2 ='lightblue'
 
+# Settings overriden from userSettings.py if run as script
+SHOWFIGS=True
+SHOWTABLES=True
 
 def bands(powers):
+    '''Report median and central 99% and 50% ranges of dataset'''
     N,M = powers.shape
     N1 = int(N/200)
     N25 = int(N/4)
@@ -39,6 +43,20 @@ def bands(powers):
         bands[3,i] = powers[order[N75],i]
         bands[4,i] = powers[order[N99],i]
     return bands
+def sph_map_vec(nlats,nlons,lmax=30):
+    ngrid = nlats*nlons
+    i=0
+    ll = np.zeros([ngrid,2])
+    for ilat,lat in enumerate(np.linspace(-90,90,nlats)):
+        for ilon,lon in enumerate(np.linspace(-180,180,nlons)):
+            ll[i,:] = lat,lon
+            i+=1
+    out = []
+    for l in range(1,lmax+1):
+        for m in range(-l,l+1):
+            out+=[real_sph_harm(m,l,ll[:,1].reshape(nlats,nlons),ll[:,0].reshape(nlats,nlons),radians=False)]
+    return ll,np.array(out).reshape((-1,ngrid))
+
 def plotDatasets(datafile,outfile):
     plt.rcParams['font.size']=12
     data = np.loadtxt(datafile)
@@ -188,26 +206,26 @@ def plotCovariance(paramfile_ha,paramfile_all,paramfile_ship,outfile):
     dd = np.linspace(-radMax,radMax,nRad)
     fig = plt.figure(figsize=(8,4))
     ax = fig.add_subplot(111)
-    print("Table 1:")
-    print("        mu   delta   sig1   sig2     v")
+    print("  Table 1:")
+    print("          mu   delta   sig1   sig2     v")
     try:
         params_spot_ha = loadOptimalParams(paramfile_ha)
-        print("  HA: %5.2f          %4.2f   %4.2f   %4.2f"%(params_spot_ha[3],*params_spot_ha[0:3]))
+        print("    HA: %5.2f          %4.2f   %4.2f   %4.2f"%(params_spot_ha[3],*params_spot_ha[0:3]))
         ax.plot(6371*dd,matern_full(abs(dd),params_spot_ha[0:3]),color=color_spot_1,label='High accuracy spot only',zorder=3)
     except FileNotFoundError:
-        print ("Unable to load optimal parameters for high-accuracy spot data; continuing...")
+        print ("  Unable to load optimal parameters for high-accuracy spot data; continuing...")
     try:
         params_spot_all = loadOptimalParams(paramfile_all)
-        print(" All: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_all[3],params_spot_all[4],*params_spot_all[0:3]))
+        print("   All: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_all[3],params_spot_all[4],*params_spot_all[0:3]))
         ax.plot(6371*dd,matern_full(abs(dd),params_spot_all[0:3]),color=color_all_1,linestyle='--',label="All spot",zorder=2)
     except FileNotFoundError:
-        print ("Unable to load optimal parameters for all spot data; continuing...")
+        print ("  Unable to load optimal parameters for all spot data; continuing...")
     try:
         params_spot_ship = loadOptimalParams(paramfile_ship)
-        print("Ship: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_ship[3],params_spot_ship[4],*params_spot_ship[0:3]))
+        print("  Ship: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_ship[3],params_spot_ship[4],*params_spot_ship[0:3]))
         ax.plot(6371*dd,matern_full(abs(dd),params_spot_ship[0:3]),color=color_spot_ship_1,linestyle='--',label="All spot and shiptrack",zorder=1)
     except FileNotFoundError:
-        print ("Unable to load optimal parameters for shiptrack data; continuing...")
+        print ("  Unable to load optimal parameters for shiptrack data; continuing...")
     ax.set_xlim(-kmMax,kmMax)
     ax.set_xticks([-10000,-5000,0,5000,10000])
     ax.set_xlabel(r"Distance, $d(\mathbf{x},\mathbf{x^\prime})$, km")
@@ -221,124 +239,139 @@ def plotCovariance(paramfile_ha,paramfile_all,paramfile_ship,outfile):
 def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_sample=100000):
     plt.rcParams['font.size']=12
     np.random.seed(42) # Seed random number generator for repeatability
-    try:
-        y_spot_ha,Sigma_spot_ha = loadSpectrum(sphfile_ha)
-        pow_spot_ha = modelToPower(y_spot_ha)
-        random_spot_ha = modelToPower(np.random.multivariate_normal(y_spot_ha,Sigma_spot_ha,size=n_sample))
-    except FileNotFoundError:
-        print("Unable to load spherical harmonic coefficients for high-accuracy spot data; continuing...")
-    try:
-        y_spot_all,Sigma_spot_all = loadSpectrum(sphfile_all)
-        pow_spot_all = modelToPower(y_spot_all)
-        random_spot_all = modelToPower(np.random.multivariate_normal(y_spot_all,Sigma_spot_all,size=n_sample))
-    except FileNotFoundError:
-        print("Unable to load spherical harmonic coefficients for all spot data; continuing...")
-    try:
-        y_spot_ship,Sigma_spot_ship = loadSpectrum(sphfile_ship)
-        pow_spot_ship = modelToPower(y_spot_ship)
-        random_spot_ship = modelToPower(np.random.multivariate_normal(y_spot_ship,Sigma_spot_ship,size=n_sample))
-    except FileNotFoundError:
-        print("Unable to load spherical harmonic coefficients for shiptrack data; continuing...")
+    fig = plt.figure(figsize=(12,4))
+    # Grid for finding the maximum absolute topographic height
+    nlats = 45
+    nlons = 90
+    if SHOWTABLES: ll,smv = sph_map_vec(nlats,nlons)
+    # Load ARD results from Davies et al. 2019
     try:
         davies_ARD = np.loadtxt('Davies_ARD.dat')
     except FileNotFoundError:
-        print("Unable to load ARD results; continuing...")
-
-    fig = plt.figure(figsize=(12,4))
-    ax = fig.add_subplot(131)
-    # High-accuracy spot
+        print("  Unable to load ARD results; omitting...")
     try:
+        ax = fig.add_subplot(131)
+        y_spot_ha,Sigma_spot_ha = loadSpectrum(sphfile_ha)
+        pow_spot_ha = modelToPower(y_spot_ha)
+        posterior_samples_ha = np.random.multivariate_normal(y_spot_ha,Sigma_spot_ha,size=n_sample)
+        random_spot_ha = modelToPower(posterior_samples_ha)
         b = bands(random_spot_ha)
-        print("High accuracy spot data: %i random samples from posterior (Table 2)"%n_sample)
-        for l in range(1,pow_spot_ha.shape[0]+1):
-            print("l=%2i:  MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_ha[l-1],random_spot_ha[:,l-1].mean(),random_spot_ha[:,l-1].std(),
-                                                                                                b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
+        if SHOWTABLES:
+            print("  High accuracy spot data: power of %i random samples from posterior (Table 2)"%n_sample)
+            for l in range(1,pow_spot_ha.shape[0]+1):
+                print("    l=%2i:  MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_ha[l-1],random_spot_ha[:,l-1].mean(),random_spot_ha[:,l-1].std(),
+                                                                                                    b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
+            print("  High accuracy spot data: maximum absolute topographic heights across random samples (Table 3)")
+            d = abs(posterior_samples_ha[:,0:15].dot(smv[0:15,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 1--3   - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[0:15,:].T.dot(y_spot_ha[0:15])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
+            d = abs(posterior_samples_ha[:,15:120].dot(smv[15:120,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 3--10  - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[15:120,:].T.dot(y_spot_ha[15:120])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
+            d = abs(posterior_samples_ha[:,120:].dot(smv[120:,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 11--30 - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[120:,:].T.dot(y_spot_ha[120:])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
         ax.plot(np.arange(1,pow_spot_ha.shape[0]+1),pow_spot_ha,color=color_spot_1)
-    except NameError:
-        pass
-    try:
-        ax.fill_between(np.arange(1,pow_spot_ha.shape[0]+1),davies_ARD[:pow_spot_ha.shape[0],2],davies_ARD[:pow_spot_ha.shape[0],3],color='darkgrey',alpha=0.5)
-        ax.fill_between(np.arange(1,pow_spot_ha.shape[0]+1),davies_ARD[:pow_spot_ha.shape[0],4],davies_ARD[:pow_spot_ha.shape[0],5],color='grey',alpha=0.5,label="Davies et al. (2019), ARD")
-    except NameError:
-        pass
-    try:
+        try:
+            ax.fill_between(np.arange(1,pow_spot_ha.shape[0]+1),davies_ARD[:pow_spot_ha.shape[0],2],davies_ARD[:pow_spot_ha.shape[0],3],color='darkgrey',alpha=0.5)
+            ax.fill_between(np.arange(1,pow_spot_ha.shape[0]+1),davies_ARD[:pow_spot_ha.shape[0],4],davies_ARD[:pow_spot_ha.shape[0],5],color='grey',alpha=0.5,label="Davies et al. (2019), ARD")
+        except NameError:
+            pass
         ax.fill_between(np.arange(1,pow_spot_ha.shape[0]+1),b[0,:],b[4,:],color=color_spot_2,alpha=0.6)
         ax.fill_between(np.arange(1,pow_spot_ha.shape[0]+1),b[1,:],b[3,:],color=color_spot_1,alpha=0.6,label="High accuracy spot only")
-    except NameError:
-        pass
-    ax.text(0.025,0.925,'(a)',transform=ax.transAxes)
-    ax.legend(loc="lower left")
-    ax.set_yscale('log')
-    ax.set_ylabel(r"Power, km${}^2$")
-    ax.set_ylim(1e-3,2.)
-    ax.set_xlim(1,30)
-    ax.set_xticks([1,10,20,30])
-    ax.set_xlabel("Spherical harmonic degree")
-    ax.grid()
-    # All spot data
-    ax = fig.add_subplot(132)
+        ax.text(0.025,0.925,'(a)',transform=ax.transAxes)
+        ax.legend(loc="lower left")
+        ax.set_yscale('log')
+        ax.set_ylabel(r"Power, km${}^2$")
+        ax.set_ylim(1e-3,2.)
+        ax.set_xlim(1,30)
+        ax.set_xticks([1,10,20,30])
+        ax.set_xlabel("Spherical harmonic degree")
+        ax.grid()
+    except FileNotFoundError:
+        print("  Unable to load spherical harmonic coefficients for high-accuracy spot data; continuing...")
     try:
+        ax = fig.add_subplot(132)
+        y_spot_all,Sigma_spot_all = loadSpectrum(sphfile_all)
+        pow_spot_all = modelToPower(y_spot_all)
+        posterior_samples_all = np.random.multivariate_normal(y_spot_all,Sigma_spot_all,size=n_sample)
+        random_spot_all = modelToPower(posterior_samples_all)
         b = bands(random_spot_all)
-        print("All spot data: %i random samples from posterior (Table 2)"%n_sample)
-        for l in range(1,pow_spot_all.shape[0]+1):
-            print("l=%2i: MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_all[l-1],random_spot_all[:,l-1].mean(),random_spot_all[:,l-1].std(),
-                                                                                                        b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
-        #ax.plot(np.arange(1,pow_spot_ship.shape[0]+1),davies_ARD[:pow_spot.shape[0],1],color='darkgrey')
+        if SHOWTABLES:
+            print("  All spot data: power of %i random samples from posterior (Table 2)"%n_sample)
+            for l in range(1,pow_spot_all.shape[0]+1):
+                print("    l=%2i: MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_all[l-1],random_spot_all[:,l-1].mean(),random_spot_all[:,l-1].std(),
+                                                                                                            b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
+            print("  All spot data: maximum absolute topographic heights across random samples (Table 3)")
+            d = abs(posterior_samples_all[:,0:15].dot(smv[0:15,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 1--3   - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[0:15,:].T.dot(y_spot_all[0:15])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
+            d = abs(posterior_samples_all[:,15:120].dot(smv[15:120,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 3--10  - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[15:120,:].T.dot(y_spot_all[15:120])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
+            d = abs(posterior_samples_all[:,120:].dot(smv[120:,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 11--30 - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[120:,:].T.dot(y_spot_all[120:])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
         ax.plot(np.arange(1,pow_spot_all.shape[0]+1),pow_spot_all,color=color_all_1)
-    except NameError:
-        pass
-    try:
-        ax.fill_between(np.arange(1,pow_spot_all.shape[0]+1),davies_ARD[:pow_spot_all.shape[0],2],davies_ARD[:pow_spot_all.shape[0],3],color='darkgrey',alpha=0.5)
-        ax.fill_between(np.arange(1,pow_spot_all.shape[0]+1),davies_ARD[:pow_spot_all.shape[0],4],davies_ARD[:pow_spot_all.shape[0],5],color='grey',alpha=0.5,label="Davies et al. (2019), ARD")
-    except NameError:
-        pass
-    try:
+        try:
+            ax.fill_between(np.arange(1,pow_spot_all.shape[0]+1),davies_ARD[:pow_spot_all.shape[0],2],davies_ARD[:pow_spot_all.shape[0],3],color='darkgrey',alpha=0.5)
+            ax.fill_between(np.arange(1,pow_spot_all.shape[0]+1),davies_ARD[:pow_spot_all.shape[0],4],davies_ARD[:pow_spot_all.shape[0],5],color='grey',alpha=0.5,label="Davies et al. (2019), ARD")
+        except NameError:
+            pass
         ax.fill_between(np.arange(1,pow_spot_all.shape[0]+1),b[0,:],b[4,:],color=color_all_2,alpha=0.6)
         ax.fill_between(np.arange(1,pow_spot_all.shape[0]+1),b[1,:],b[3,:],color=color_all_1,alpha=0.6,label="All spot")
-    except NameError:
-        pass
-    ax.text(0.025,0.925,'(b)',transform=ax.transAxes)
-    ax.legend(loc="lower left")
-    ax.set_yscale('log')
-    ax.set_ylim(1e-3,2.)
-    ax.set_yticklabels([])
-    ax.set_xlim(1,30)
-    ax.set_xticks([1,10,20,30])
-    ax.set_xlabel("Spherical harmonic degree")
-    ax.grid()
-
-    # All spot + shiptrack
-    ax = fig.add_subplot(133)
+        ax.text(0.025,0.925,'(b)',transform=ax.transAxes)
+        ax.legend(loc="lower left")
+        ax.set_yscale('log')
+        ax.set_ylim(1e-3,2.)
+        ax.set_yticklabels([])
+        ax.set_xlim(1,30)
+        ax.set_xticks([1,10,20,30])
+        ax.set_xlabel("Spherical harmonic degree")
+        ax.grid()
+    except FileNotFoundError:
+        print("  Unable to load spherical harmonic coefficients for all spot data; continuing...")
     try:
+        ax = fig.add_subplot(133)
+        y_spot_ship,Sigma_spot_ship = loadSpectrum(sphfile_ship)
+        pow_spot_ship = modelToPower(y_spot_ship)
+        posterior_samples_ship = np.random.multivariate_normal(y_spot_ship,Sigma_spot_ship,size=n_sample)
+        random_spot_ship = modelToPower(posterior_samples_ship)
         b = bands(random_spot_ship)
-        print("All spot and shiptrack data: %i random samples from posterior (Table 2)"%n_sample)
-        for l in range(1,pow_spot_ship.shape[0]+1):
-            print("l=%2i:  MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_ship[l-1],random_spot_ship[:,l-1].mean(),random_spot_ship[:,l-1].std(),
-                                                                                                    b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
-        #ax.plot(np.arange(1,pow_spot_ship.shape[0]+1),davies_ARD[:pow_spot.shape[0],1],color='darkgrey')
+        if SHOWTABLES:
+            print("  All spot and shiptrack data: power of %i random samples from posterior (Table 2)"%n_sample)
+            for l in range(1,pow_spot_ship.shape[0]+1):
+                print("    l=%2i:  MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_ship[l-1],random_spot_ship[:,l-1].mean(),random_spot_ship[:,l-1].std(),
+                                                                                                        b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
+            print("  All spot and shiptrack data: maximum absolute topographic heights across random samples (Table 3)")
+            d = abs(posterior_samples_ship[:,0:15].dot(smv[0:15,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 1--3   - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[0:15,:].T.dot(y_spot_ship[0:15])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
+            d = abs(posterior_samples_ship[:,15:120].dot(smv[15:120,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 3--10  - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[15:120,:].T.dot(y_spot_ship[15:120])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
+            d = abs(posterior_samples_ship[:,120:].dot(smv[120:,:])).max(1)
+            srt = np.argsort(d)
+            print("    Degrees 11--30 - MP = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(abs(smv[120:,:].T.dot(y_spot_ship[120:])).max(),d[srt[int(n_sample/200)]],d[srt[int(199*n_sample/200)]],d[srt[int(25*n_sample/100)]],d[srt[int(75*n_sample/100)]]))
         ax.plot(np.arange(1,pow_spot_ship.shape[0]+1),pow_spot_ship,color=color_spot_ship_1)
-    except NameError:
-        pass
-    try:
-        ax.fill_between(np.arange(1,pow_spot_ship.shape[0]+1),davies_ARD[:pow_spot_ship.shape[0],2],davies_ARD[:pow_spot_ship.shape[0],3],color='darkgrey',alpha=0.5)
-        ax.fill_between(np.arange(1,pow_spot_ship.shape[0]+1),davies_ARD[:pow_spot_ship.shape[0],4],davies_ARD[:pow_spot_ship.shape[0],5],color='grey',alpha=0.5,label="Davies et al. (2019), ARD")
-    except NameError:
-        pass
-    try:
+        try:
+            ax.fill_between(np.arange(1,pow_spot_ship.shape[0]+1),davies_ARD[:pow_spot_ship.shape[0],2],davies_ARD[:pow_spot_ship.shape[0],3],color='darkgrey',alpha=0.5)
+            ax.fill_between(np.arange(1,pow_spot_ship.shape[0]+1),davies_ARD[:pow_spot_ship.shape[0],4],davies_ARD[:pow_spot_ship.shape[0],5],color='grey',alpha=0.5,label="Davies et al. (2019), ARD")
+        except NameError:
+            pass
         ax.fill_between(np.arange(1,pow_spot_ship.shape[0]+1),b[0,:],b[4,:],color=color_spot_ship_2,alpha=0.6)
         ax.fill_between(np.arange(1,pow_spot_ship.shape[0]+1),b[1,:],b[3,:],color=color_spot_ship_1,alpha=0.6,label="All spot and shiptrack")
-    except NameError:
-        pass
-    ax.text(0.025,0.925,'(c)',transform=ax.transAxes)
-    ax.legend(loc="lower left")
-    ax.set_yscale('log')
-    ax.set_ylim(1e-3,2.)
-    ax.set_yticklabels([])
-    ax.set_xlim(1,30)
-    ax.set_xticks([1,10,20,30])
-    ax.set_xlabel("Spherical harmonic degree")
-    ax.grid()
-
+        ax.text(0.025,0.925,'(c)',transform=ax.transAxes)
+        ax.legend(loc="lower left")
+        ax.set_yscale('log')
+        ax.set_ylim(1e-3,2.)
+        ax.set_yticklabels([])
+        ax.set_xlim(1,30)
+        ax.set_xticks([1,10,20,30])
+        ax.set_xlabel("Spherical harmonic degree")
+        ax.grid()
+    except FileNotFoundError:
+        print("  Unable to load spherical harmonic coefficients for shiptrack data; continuing...")
     plt.tight_layout()
     plt.savefig(outfile_spec)
     if SHOWFIGS: plt.show()
@@ -387,6 +420,7 @@ def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_
     plt.savefig(outfile_hist)
     if SHOWFIGS: plt.show()
 def plotWhereToSample(mapdatafile,samplemask,outfile,llist=[2,5,10,15,20,30]):
+    plt.rcParams['font.size']=12
     with open(mapdatafile,'rb') as fp:
         mean = pickle.load(fp)
         variance = pickle.load(fp)
@@ -404,7 +438,6 @@ def plotWhereToSample(mapdatafile,samplemask,outfile,llist=[2,5,10,15,20,30]):
     rowshift = 0.28
     height=0.25
     for i,l in enumerate(llist):
-        print("Working on panel %i of %i..."%(i+1,len(llist)))
         #ax = fig_dkl.add_subplot(3,2,i+1,projection=ccrs.Robinson())
         ax = fig_dkl.add_axes((c1 +(i%2)*cshift,r1+(2-int(i/2))*rowshift,width,height),projection=ccrs.Robinson())
         ax.set_global()
@@ -424,7 +457,63 @@ def plotWhereToSample(mapdatafile,samplemask,outfile,llist=[2,5,10,15,20,30]):
     ax.set_xlabel("Value of one additional sample")
     plt.savefig(outfile)
     if SHOWFIGS:plt.show()
-
+def plotLowDegrees(sph_ha,sph_all,sph_ship,outfile):
+    nlats = 90
+    nlons = 180
+    ll,smv = sph_map_vec(nlats,nlons)
+    plt.rcParams['font.size']=12
+    fig = plt.figure(figsize=(8,10))
+    x0=0.05
+    y0=0.05
+    cy=0.03
+    ysp=0.04
+    my=(1-(2*y0)-cy)/3 - ysp
+    for i,file in enumerate([sph_ha,sph_all,sph_ship]):
+        ax = fig.add_axes((x0,y0+cy+(2-i)*(ysp+my)+ysp,1-2*x0,my),projection=ccrs.Robinson())
+        ax.text(0.0,0.95,'(%s)'%(['a','b','c'][i]),transform=ax.transAxes)
+        ax.coastlines()
+        try:
+            y,Sigma = loadSpectrum(file)
+        except FileNotFoundError:
+            print("  Unable to load %s; continuing..."%file)
+            continue
+        mapdata = y[0:15].dot(smv[0:15,:]).reshape(nlats,nlons)
+        pc = ax.pcolor(ll[:,1].reshape(nlats,nlons),ll[:,0].reshape(nlats,nlons),mapdata,cmap=plt.cm.coolwarm,transform=ccrs.PlateCarree())
+        pc.set_edgecolor('face')
+        co = ax.contour(ll[:,1].reshape(nlats,nlons),ll[:,0].reshape(nlats,nlons),y[0:15].dot(smv[0:15,:]).reshape(nlats,nlons),levels=np.arange(-1.4,1.5,0.2),transform=ccrs.PlateCarree(),colors='k')
+        pc.set_clim(-.8,.8)
+        ax.text(0.9,0,'%.2f/%.2f'%(mapdata.min(),mapdata.max()),transform=ax.transAxes)
+    ax = fig.add_axes((x0+0.25,y0,1-2*(x0+0.25),cy))
+    plt.colorbar(pc,cax=ax,orientation='horizontal',ticks=[-.8,-.4,0,.4,.8],label="Residual topography at degrees 1-3, km")
+    ax.xaxis.set_label_position('top')
+    plt.savefig(outfile)
+    if SHOWFIGS:plt.show()
+def calculateModelRange(datafile,dataset_type,paramfile,inversefile,nlats = 45,nlons = 90,n_sample=100000):
+    try:
+        data,ndata = loadData(datafile,dataset_type)
+        optimal_params = loadOptimalParams(paramfile)
+        ngrid = nlats*nlons
+        data[:,2] -= optimal_params[3]
+        with open(inversefile,'rb') as fp:
+            iK = pickle.load(fp)
+    except FileNotFoundError:
+        print("    Data files not found; skipping...")
+        return
+    k1 = np.zeros([ngrid,ngrid])
+    k2 = np.zeros([ngrid,data.shape[0]])
+    ll = np.zeros([ngrid,2])
+    i = 0
+    for ilat,lat in enumerate(np.linspace(-90,90,nlats)):
+        for ilon,lon in enumerate(np.linspace(-180,180,nlons)):
+            ll[i,:] = lat,lon
+            i+=1
+    for i in range(ngrid):
+        k1[:,i] = matern_full(dist(ll[i,0],ll[i,1],ll[:,0],ll[:,1]),optimal_params[0:3])
+        k2[i,:] = matern_full(dist(ll[i,0],ll[i,1],data[:,0],data[:,1]),optimal_params[0:3])
+    rmaps = np.random.multivariate_normal(k2.dot(iK).dot(data[:,2]),k1 - k2.dot(iK).dot(k2.T),size=n_sample)
+    maxs = abs(rmaps).max(1)
+    srt = np.argsort(maxs)
+    print('    Median: %.2f  99: %.2f--%.2f  50: %.2f--%.2f'%(maxs[srt[int(n_sample/2)]],maxs[srt[int(n_sample/200)]],maxs[srt[int(199*n_sample/200)]],maxs[srt[int(n_sample/4)]],maxs[srt[int(3*n_sample/4)]]))
 
 if __name__ == '__main__':
     outputdir = os.path.abspath(userSettings.outputdir)
@@ -440,6 +529,7 @@ if __name__ == '__main__':
         print("Please check and modify 'datafile' in userSettings.py if necessary.")
         sys.exit(1)
     SHOWFIGS = userSettings.PLT_SHOW
+    SHOWTABLES = userSettings.TABLE_DATA
     figdir=os.path.join(outputdir,'figures')
     if not os.path.exists(figdir): os.mkdir(figdir)
     # Create some functions to handle paths neatly
@@ -450,34 +540,63 @@ if __name__ == '__main__':
 
 
     # Map of raw data -- Fig. 1
+    print("Making figure 1: Map of raw data")
     plotDatasets(datafile,figpath('data.pdf'))
-    # Maps for all three models -- Figs. 2--4
-    try:
-        plotMap(ha_spot('mapdata.pickle'),figpath('map_high_accuracy_spot.pdf'))
-    except FileNotFoundError:
-        print("Unable to find data files for map of high-accuracy spot data. Continuing...")
-    try:
-        plotMap(all_spot('mapdata.pickle'),figpath('map_all_spot.pdf'))
-    except FileNotFoundError:
-        print("Unable to find data files for map of all spot data. Continuing...")
-    try:
-        plotMap(spot_ship('mapdata.pickle'),figpath('map_spot_shiptrack.pdf'))
-    except FileNotFoundError:
-        print("Unable to find data files for map of spot and shiptrack data. Continuing...")
-    # Plot of covariance functions -- Fig. 5
+    print("Figure 1 complete; file saved at %s\n"%figpath('data.pdf'))
+    # Plot of covariance functions -- Fig. 2; Part of Table 1
+    print("Making figure 2: plot of covariance functions")
     plotCovariance(ha_spot('optimal_params.pickle'),
                    all_spot('optimal_params.pickle'),
                    spot_ship('optimal_params.pickle'),
                    figpath('k_comparison.pdf'))
-    # Plot of spectra -- Fig. 6-7
+    print("Figure 2 complete; file saved at %s\n"%figpath('k_comparison.pdf'))
+    # Maps for all three models -- Figs. 3--5
+    try:
+        print("Making figure 3: Map of GP model from high-accuracy spot data")
+        plotMap(ha_spot('mapdata.pickle'),figpath('map_high_accuracy_spot.pdf'))
+        print("Figure 3 complete; file saved at %s\n"%figpath('map_high_accuracy_spot.pdf'))
+    except FileNotFoundError:
+        print("Unable to find necessary data files. Skipping...\n")
+    try:
+        print("Making figure 4: Map of GP model from all spot data")
+        plotMap(all_spot('mapdata.pickle'),figpath('map_all_spot.pdf'))
+        print("Figure 4 complete; file saved at %s\n"%figpath('map_all_spot.pdf'))
+    except FileNotFoundError:
+        print("Unable to find necessary data files. Skipping...\n")
+    try:
+        print("Making figure 5: Map of GP model from spot and shiptrack data")
+        plotMap(spot_ship('mapdata.pickle'),figpath('map_spot_shiptrack.pdf'))
+        print("Figure 5 complete; file saved at %s\n"%figpath('map_spot_shiptrack.pdf'))
+    except FileNotFoundError:
+        print("Unable to find necessary data files. Skipping...\n")
+    if SHOWTABLES: # Part of Table 3
+        print("Computing maximum absolute amplitudes for full models (Table 3)")
+        print("  (For values associated with most-probable model refer to Figs. 2--5)")
+        print("  High accuracy spot data (%i random samples)"%userSettings.N_RANDOM_SAMPLES)
+        calculateModelRange(datafile,'high_accuracy_spot',ha_spot('optimal_params.pickle'),ha_spot('inverseCov.pickle'),n_sample = userSettings.N_RANDOM_SAMPLES)
+        print("  All spot data (%i random samples)"%userSettings.N_RANDOM_SAMPLES)
+        calculateModelRange(datafile,'all_spot',all_spot('optimal_params.pickle'),all_spot('inverseCov.pickle'),n_sample = userSettings.N_RANDOM_SAMPLES)
+        print("  Spot and shiptrack data (%i random samples)"%userSettings.N_RANDOM_SAMPLES)
+        calculateModelRange(datafile,'spot_shiptrack',spot_ship('optimal_params.pickle'),spot_ship('inverseCov.pickle'),n_sample = userSettings.N_RANDOM_SAMPLES)
+        print("")
+    # Plot of spectra -- Fig. 6-7; Table 2; Part of Table 3
+    print("Making figures 6 & 7: Plots of spectra")
     plotSpectra(ha_spot('sphcoeff.pickle'),
                  all_spot('sphcoeff.pickle'),
                  spot_ship('sphcoeff.pickle'),
                  figpath('spectra.pdf'),
                  figpath('histograms.pdf'),
-                 100000)
+                 n_sample = userSettings.N_RANDOM_SAMPLES)
+    print("Figure 6 complete; file saved at %s"%figpath('spectra.pdf'))
+    print("Figure 7 complete; file saved at %s\n"%figpath('histograms.pdf'))
     try:
         # Map of where to sample -- Fig. 8
+        print("Making figure 8: Map of value of one additional sample")
         plotWhereToSample(ha_spot('mapdata.pickle'),ha_spot('sampling_%i.pickle'),figpath('wheretosample.pdf'))
+        print("Figure 8 complete; file saved at %s\n"%figpath('wheretosample.pdf'))
     except FileNotFoundError:
-        print("Unable to find data files for map of where to sample.")
+        print("Unable to find necessary data files. Skipping...")
+    print("Making figure 9: Map of low-degree residual topography")
+    plotLowDegrees(ha_spot('sphcoeff.pickle'),all_spot('sphcoeff.pickle'),spot_ship('sphcoeff.pickle'),figpath('1to3.pdf'))
+    print("Figure 9 complete; file saved at %s\n"%figpath('1to3.pdf'))
+    print("All figures generated.")
