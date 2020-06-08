@@ -489,6 +489,8 @@ def plotLowDegrees(sph_ha,sph_all,sph_ship,outfile):
     plt.savefig(outfile)
     if SHOWFIGS:plt.show()
 def calculateModelRange(datafile,dataset_type,paramfile,inversefile,nlats = 45,nlons = 90,n_sample=100000):
+    # Seed RNG for repeatability
+    np.random.seed(42)
     try:
         data,ndata = loadData(datafile,dataset_type)
         optimal_params = loadOptimalParams(paramfile)
