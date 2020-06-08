@@ -571,7 +571,7 @@ if __name__ == '__main__':
         print("Unable to find necessary data files. Skipping...\n")
     if SHOWTABLES: # Part of Table 3
         print("Computing maximum absolute amplitudes for full models (Table 3)")
-        print("  (For values associated with most-probable model refer to Figs. 2--5)")
+        print("  (For values associated with most-probable model refer to Figs. 3--5)")
         print("  High accuracy spot data (%i random samples)"%userSettings.N_RANDOM_SAMPLES)
         calculateModelRange(datafile,'high_accuracy_spot',ha_spot('optimal_params.pickle'),ha_spot('inverseCov.pickle'),n_sample = userSettings.N_RANDOM_SAMPLES)
         print("  All spot data (%i random samples)"%userSettings.N_RANDOM_SAMPLES)
