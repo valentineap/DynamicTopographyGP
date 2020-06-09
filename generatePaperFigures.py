@@ -58,7 +58,7 @@ def sph_map_vec(nlats,nlons,lmax=30):
     return ll,np.array(out).reshape((-1,ngrid))
 
 def plotDatasets(datafile,outfile):
-    plt.rcParams['font.size']=12
+    plt.rcParams['font.size']=14
     data = np.loadtxt(datafile)
     data[N_HIGH_ACCURACY:,3]-=0.2
     max_abs_data=2.6
@@ -206,23 +206,24 @@ def plotCovariance(paramfile_ha,paramfile_all,paramfile_ship,outfile):
     dd = np.linspace(-radMax,radMax,nRad)
     fig = plt.figure(figsize=(8,4))
     ax = fig.add_subplot(111)
-    print("  Table 1:")
-    print("          mu   delta   sig1   sig2     v")
+    if SHOWTABLES:
+        print("  Table 1:")
+        print("          mu   delta   sig1   sig2     v")
     try:
         params_spot_ha = loadOptimalParams(paramfile_ha)
-        print("    HA: %5.2f          %4.2f   %4.2f   %4.2f"%(params_spot_ha[3],*params_spot_ha[0:3]))
+        if SHOWTABLES: print("    HA: %5.2f          %4.2f   %4.2f   %4.2f"%(params_spot_ha[3],*params_spot_ha[0:3]))
         ax.plot(6371*dd,matern_full(abs(dd),params_spot_ha[0:3]),color=color_spot_1,label='High accuracy spot only',zorder=3)
     except FileNotFoundError:
         print ("  Unable to load optimal parameters for high-accuracy spot data; continuing...")
     try:
         params_spot_all = loadOptimalParams(paramfile_all)
-        print("   All: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_all[3],params_spot_all[4],*params_spot_all[0:3]))
+        if SHOWTABLES: print("   All: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_all[3],params_spot_all[4],*params_spot_all[0:3]))
         ax.plot(6371*dd,matern_full(abs(dd),params_spot_all[0:3]),color=color_all_1,linestyle='--',label="All spot",zorder=2)
     except FileNotFoundError:
         print ("  Unable to load optimal parameters for all spot data; continuing...")
     try:
         params_spot_ship = loadOptimalParams(paramfile_ship)
-        print("  Ship: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_ship[3],params_spot_ship[4],*params_spot_ship[0:3]))
+        if SHOWTABLES: print("  Ship: %5.2f   %4.2f   %4.2f   %4.2f   %4.2f"%(params_spot_ship[3],params_spot_ship[4],*params_spot_ship[0:3]))
         ax.plot(6371*dd,matern_full(abs(dd),params_spot_ship[0:3]),color=color_spot_ship_1,linestyle='--',label="All spot and shiptrack",zorder=1)
     except FileNotFoundError:
         print ("  Unable to load optimal parameters for shiptrack data; continuing...")
@@ -237,7 +238,7 @@ def plotCovariance(paramfile_ha,paramfile_all,paramfile_ship,outfile):
     plt.savefig(outfile)
     if SHOWFIGS: plt.show()
 def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_sample=100000):
-    plt.rcParams['font.size']=12
+    plt.rcParams['font.size']=14
     np.random.seed(42) # Seed random number generator for repeatability
     fig = plt.figure(figsize=(12,4))
     # Grid for finding the maximum absolute topographic height
@@ -378,7 +379,7 @@ def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_
 
     nrows = 3
     ncols = 8
-    plt.rcParams['font.size']=14
+    plt.rcParams['font.size']=16
     fig = plt.figure(figsize=(15,8))
     bins = np.linspace(0,1,100)
     for l in range(1,23):
@@ -406,7 +407,7 @@ def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_
         ax.set_xticks([])
         ax.set_yticks([0,.25,0.5,.75,1])
         ax.set_ylim(0,1)
-        ax.text(0.55,0.9,'l = %i'%l,transform=ax.transAxes)
+        ax.text(0.5,0.87,'l = %i'%l,transform=ax.transAxes)
         if l == 1 or l==9 or l==17:
             ax.set_yticklabels(['0','','0.5','','1'])
             ax.set_ylabel(r"Power, km${}^2$")
@@ -415,7 +416,7 @@ def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_
         #     ax.set_ylabel(r"Power, km${}^2$")
         else:
             ax.set_yticklabels([])
-        if l==22: fig.legend(loc=(.76,0.15))
+        if l==22: fig.legend(loc=(.75,0.15))
     plt.tight_layout()
     plt.savefig(outfile_hist)
     if SHOWFIGS: plt.show()
@@ -480,7 +481,8 @@ def plotLowDegrees(sph_ha,sph_all,sph_ship,outfile):
         mapdata = y[0:15].dot(smv[0:15,:]).reshape(nlats,nlons)
         pc = ax.pcolor(ll[:,1].reshape(nlats,nlons),ll[:,0].reshape(nlats,nlons),mapdata,cmap=plt.cm.coolwarm,transform=ccrs.PlateCarree())
         pc.set_edgecolor('face')
-        co = ax.contour(ll[:,1].reshape(nlats,nlons),ll[:,0].reshape(nlats,nlons),y[0:15].dot(smv[0:15,:]).reshape(nlats,nlons),levels=np.arange(-1.4,1.5,0.2),transform=ccrs.PlateCarree(),colors='k')
+        co = ax.contour(ll[:,1].reshape(nlats,nlons),ll[:,0].reshape(nlats,nlons),y[0:15].dot(smv[0:15,:]).reshape(nlats,nlons),levels=[-1.4,-1.2,-1,-.8,-.6,-.4,-.2,.2,.4,.6,.8,1,1.2,1.4],transform=ccrs.PlateCarree(),colors='k')
+        co = ax.contour(ll[:,1].reshape(nlats,nlons),ll[:,0].reshape(nlats,nlons),y[0:15].dot(smv[0:15,:]).reshape(nlats,nlons),levels=[0],transform=ccrs.PlateCarree(),colors='grey')
         pc.set_clim(-.8,.8)
         ax.text(0.9,0,'%.2f/%.2f'%(mapdata.min(),mapdata.max()),transform=ax.transAxes)
     ax = fig.add_axes((x0+0.25,y0,1-2*(x0+0.25),cy))
