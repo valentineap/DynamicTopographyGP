@@ -269,6 +269,8 @@ def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_
             for l in range(1,pow_spot_ha.shape[0]+1):
                 print("    l=%2i:  MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_ha[l-1],random_spot_ha[:,l-1].mean(),random_spot_ha[:,l-1].std(),
                                                                                                     b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
+            prop = random_spot_ha[:,0:15].sum(1) / random_spot_ha.sum(1)
+            print("  Proportion in degree 1-3: %.2f%% (SD = %.2f%%)"%(100*prop.mean(),100*prop.std()))
             print("  High accuracy spot data: maximum absolute topographic heights across random samples (Table 3)")
             d = abs(posterior_samples_ha[:,0:15].dot(smv[0:15,:])).max(1)
             srt = np.argsort(d)
@@ -310,6 +312,8 @@ def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_
             for l in range(1,pow_spot_all.shape[0]+1):
                 print("    l=%2i: MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_all[l-1],random_spot_all[:,l-1].mean(),random_spot_all[:,l-1].std(),
                                                                                                             b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
+            prop = random_spot_all[:,0:15].sum(1) / random_spot_all.sum(1)
+            print("  Proportion in degree 1-3: %.2f%% (SD = %.2f%%)"%(100*prop.mean(),100*prop.std()))
             print("  All spot data: maximum absolute topographic heights across random samples (Table 3)")
             d = abs(posterior_samples_all[:,0:15].dot(smv[0:15,:])).max(1)
             srt = np.argsort(d)
@@ -351,6 +355,8 @@ def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_
             for l in range(1,pow_spot_ship.shape[0]+1):
                 print("    l=%2i:  MP = %.2f  Mean = %.2f  Std = %.2f Median = %.2f  99: %.2f--%.2f  50: %.2f--%.2f"%(l,pow_spot_ship[l-1],random_spot_ship[:,l-1].mean(),random_spot_ship[:,l-1].std(),
                                                                                                         b[2,l-1],b[0,l-1],b[4,l-1],b[1,l-1],b[3,l-1]))
+            prop = random_spot_ship[:,0:15].sum(1) / random_spot_ship.sum(1)
+            print("  Proportion in degree 1-3: %.2f%% (SD = %.2f%%)"%(100*prop.mean(),100*prop.std()))
             print("  All spot and shiptrack data: maximum absolute topographic heights across random samples (Table 3)")
             d = abs(posterior_samples_ship[:,0:15].dot(smv[0:15,:])).max(1)
             srt = np.argsort(d)
