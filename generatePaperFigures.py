@@ -557,7 +557,7 @@ if __name__ == '__main__':
         print("Figure 1 complete; file saved at %s\n"%figpath('data.pdf'))
     # Plot of covariance functions -- Fig. 2; Part of Table 1
     if toggleFigure(2) or SHOWTABLES:
-    print("Making figure 2: plot of covariance functions")
+        print("Making figure 2: plot of covariance functions")
         plotCovariance(ha_spot('optimal_params.pickle'),
                        all_spot('optimal_params.pickle'),
                        spot_ship('optimal_params.pickle'),
