@@ -26,6 +26,13 @@ color_spot_ship_2 ='lightblue'
 SHOWFIGS=True
 SHOWTABLES=True
 
+def toggleFigure(n):
+    try:
+        userSettings.FIGURES.index(n)
+        return True
+    except ValueError:
+        return False
+
 def bands(powers):
     '''Report median and central 99% and 50% ranges of dataset'''
     N,M = powers.shape
@@ -238,7 +245,7 @@ def plotCovariance(paramfile_ha,paramfile_all,paramfile_ship,outfile):
     plt.savefig(outfile)
     if SHOWFIGS: plt.show()
 def plotSpectra(sphfile_ha,sphfile_all,sphfile_ship,outfile_spec,outfile_hist,n_sample=100000):
-    plt.rcParams['font.size']=14
+    plt.rcParams['font.size']=13
     np.random.seed(42) # Seed random number generator for repeatability
     fig = plt.figure(figsize=(12,4))
     # Grid for finding the maximum absolute topographic height
@@ -544,35 +551,40 @@ if __name__ == '__main__':
 
 
     # Map of raw data -- Fig. 1
-    print("Making figure 1: Map of raw data")
-    plotDatasets(datafile,figpath('data.pdf'))
-    print("Figure 1 complete; file saved at %s\n"%figpath('data.pdf'))
+    if toggleFigure(1):
+        print("Making figure 1: Map of raw data")
+        plotDatasets(datafile,figpath('data.pdf'))
+        print("Figure 1 complete; file saved at %s\n"%figpath('data.pdf'))
     # Plot of covariance functions -- Fig. 2; Part of Table 1
+    if toggleFigure(2) or SHOWTABLES:
     print("Making figure 2: plot of covariance functions")
-    plotCovariance(ha_spot('optimal_params.pickle'),
-                   all_spot('optimal_params.pickle'),
-                   spot_ship('optimal_params.pickle'),
-                   figpath('k_comparison.pdf'))
-    print("Figure 2 complete; file saved at %s\n"%figpath('k_comparison.pdf'))
+        plotCovariance(ha_spot('optimal_params.pickle'),
+                       all_spot('optimal_params.pickle'),
+                       spot_ship('optimal_params.pickle'),
+                       figpath('k_comparison.pdf'))
+        print("Figure 2 complete; file saved at %s\n"%figpath('k_comparison.pdf'))
     # Maps for all three models -- Figs. 3--5
-    try:
-        print("Making figure 3: Map of GP model from high-accuracy spot data")
-        plotMap(ha_spot('mapdata.pickle'),figpath('map_high_accuracy_spot.pdf'))
-        print("Figure 3 complete; file saved at %s\n"%figpath('map_high_accuracy_spot.pdf'))
-    except FileNotFoundError:
-        print("Unable to find necessary data files. Skipping...\n")
-    try:
-        print("Making figure 4: Map of GP model from all spot data")
-        plotMap(all_spot('mapdata.pickle'),figpath('map_all_spot.pdf'))
-        print("Figure 4 complete; file saved at %s\n"%figpath('map_all_spot.pdf'))
-    except FileNotFoundError:
-        print("Unable to find necessary data files. Skipping...\n")
-    try:
-        print("Making figure 5: Map of GP model from spot and shiptrack data")
-        plotMap(spot_ship('mapdata.pickle'),figpath('map_spot_shiptrack.pdf'))
-        print("Figure 5 complete; file saved at %s\n"%figpath('map_spot_shiptrack.pdf'))
-    except FileNotFoundError:
-        print("Unable to find necessary data files. Skipping...\n")
+    if toggleFigure(3):
+        try:
+            print("Making figure 3: Map of GP model from high-accuracy spot data")
+            plotMap(ha_spot('mapdata.pickle'),figpath('map_high_accuracy_spot.pdf'))
+            print("Figure 3 complete; file saved at %s\n"%figpath('map_high_accuracy_spot.pdf'))
+        except FileNotFoundError:
+            print("Unable to find necessary data files. Skipping...\n")
+    if toggleFigure(4):
+        try:
+            print("Making figure 4: Map of GP model from all spot data")
+            plotMap(all_spot('mapdata.pickle'),figpath('map_all_spot.pdf'))
+            print("Figure 4 complete; file saved at %s\n"%figpath('map_all_spot.pdf'))
+        except FileNotFoundError:
+            print("Unable to find necessary data files. Skipping...\n")
+    if toggleFigure(5):
+        try:
+            print("Making figure 5: Map of GP model from spot and shiptrack data")
+            plotMap(spot_ship('mapdata.pickle'),figpath('map_spot_shiptrack.pdf'))
+            print("Figure 5 complete; file saved at %s\n"%figpath('map_spot_shiptrack.pdf'))
+        except FileNotFoundError:
+            print("Unable to find necessary data files. Skipping...\n")
     if SHOWTABLES: # Part of Table 3
         print("Computing maximum absolute amplitudes for full models (Table 3)")
         print("  (For values associated with most-probable model refer to Figs. 3--5)")
@@ -584,23 +596,26 @@ if __name__ == '__main__':
         calculateModelRange(datafile,'spot_shiptrack',spot_ship('optimal_params.pickle'),spot_ship('inverseCov.pickle'),n_sample = userSettings.N_RANDOM_SAMPLES)
         print("")
     # Plot of spectra -- Fig. 6-7; Table 2; Part of Table 3
-    print("Making figures 6 & 7: Plots of spectra")
-    plotSpectra(ha_spot('sphcoeff.pickle'),
-                 all_spot('sphcoeff.pickle'),
-                 spot_ship('sphcoeff.pickle'),
-                 figpath('spectra.pdf'),
-                 figpath('histograms.pdf'),
-                 n_sample = userSettings.N_RANDOM_SAMPLES)
-    print("Figure 6 complete; file saved at %s"%figpath('spectra.pdf'))
-    print("Figure 7 complete; file saved at %s\n"%figpath('histograms.pdf'))
-    try:
-        # Map of where to sample -- Fig. 8
-        print("Making figure 8: Map of value of one additional sample")
-        plotWhereToSample(ha_spot('mapdata.pickle'),ha_spot('sampling_%i.pickle'),figpath('wheretosample.pdf'))
-        print("Figure 8 complete; file saved at %s\n"%figpath('wheretosample.pdf'))
-    except FileNotFoundError:
-        print("Unable to find necessary data files. Skipping...")
-    print("Making figure 9: Map of low-degree residual topography")
-    plotLowDegrees(ha_spot('sphcoeff.pickle'),all_spot('sphcoeff.pickle'),spot_ship('sphcoeff.pickle'),figpath('1to3.pdf'))
-    print("Figure 9 complete; file saved at %s\n"%figpath('1to3.pdf'))
+    if toggleFigure(6) or toggleFigure(7) or SHOWTABLES:
+        print("Making figures 6 & 7: Plots of spectra")
+        plotSpectra(ha_spot('sphcoeff.pickle'),
+                     all_spot('sphcoeff.pickle'),
+                     spot_ship('sphcoeff.pickle'),
+                     figpath('spectra.pdf'),
+                     figpath('histograms.pdf'),
+                     n_sample = userSettings.N_RANDOM_SAMPLES)
+        print("Figure 6 complete; file saved at %s"%figpath('spectra.pdf'))
+        print("Figure 7 complete; file saved at %s\n"%figpath('histograms.pdf'))
+    if toggleFigure(8):
+        try:
+            # Map of where to sample -- Fig. 8
+            print("Making figure 8: Map of value of one additional sample")
+            plotWhereToSample(ha_spot('mapdata.pickle'),ha_spot('sampling_%i.pickle'),figpath('wheretosample.pdf'))
+            print("Figure 8 complete; file saved at %s\n"%figpath('wheretosample.pdf'))
+        except FileNotFoundError:
+            print("Unable to find necessary data files. Skipping...")
+    if toggleFigure(9):
+        print("Making figure 9: Map of low-degree residual topography")
+        plotLowDegrees(ha_spot('sphcoeff.pickle'),all_spot('sphcoeff.pickle'),spot_ship('sphcoeff.pickle'),figpath('1to3.pdf'))
+        print("Figure 9 complete; file saved at %s\n"%figpath('1to3.pdf'))
     print("All figures generated.")

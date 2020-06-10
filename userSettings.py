@@ -29,6 +29,11 @@ DO_SPOT_SHIP = False
 #How many random samples should be used for computing statistics? (Larger = slower)
 N_RANDOM_SAMPLES = 100000
 
+# Which figures should be generated? List of figure numbers. Note that this selection
+# may not be fully honoured: figs 6 & 7 cannot be generated independently, and
+# setting TABLE_DATA = True below will force generation of Figs. 2, 6 & 7.
+FIGURES = [1,2,3,4,5,6,7,8,9]
+
 # When generating figures, should plt.show() be called?
 # Note that this may cause the interpreter to block and
 # wait for the figure to be closed
