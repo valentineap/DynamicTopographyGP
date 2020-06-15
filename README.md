@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/269817443.svg)](https://zenodo.org/badge/latestdoi/269817443)
+
 This repository implements the analysis described in:
 
 Valentine, A.P. and D.R. Davies, in review. Global Models from Sparse Data: A
