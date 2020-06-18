@@ -5,6 +5,8 @@ This repository implements the analysis described in:
 Valentine, A.P. and D.R. Davies, in review. Global Models from Sparse Data: A
 Robust Estimate of Earth's Residual Topography Spectrum.
 
+A preprint of this paper [is available here](https://doi.org/10.1002/essoar.10503393.1).
+
 There are two main scripts. The data analysis is carried out by running
 `analyseData.py`. This performs hyperparameter optimisation, constructs and
 inverts the Gaussian Process covariance matrix, evaluates the GP on a regular
@@ -28,7 +30,7 @@ Note that analysing the full dataset is computationally- and memory-intensive
 default. The plotting scripts are intended to be robust to missing subsets.
 
 The data analysed in this study is available at:
-https://github.com/drhodrid/Davies_etal_NGeo_2019_Datasets.git
+https://github.com/drhodrid/Davies_etal_NGeo_2019_Datasets.git.
 It is included as a submodule (~link) within this repository. If you have just
 obtained this repository from github you may need to run:
 ```
