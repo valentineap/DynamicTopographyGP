@@ -411,3 +411,24 @@ def calculateWhereToSample(dataset_type,datafile,paramfile,covfile,sphfile,mapda
         with open(outfile_mask%l,'wb') as fp:
             pickle.dump(dkl_min,fp)
             pickle.dump(dkl,fp)
+def testPerformance(dataset_type,datafile,paramfile,covfile,testpointfile,outfile):
+    print("- Evaluating predictions against known dataset")
+    data,ndata = loadData(datafile,dataset_type)
+    test,ntest = loadData(testpointfile,'spot_shiptrack') # Load as 'spot_shiptrack' to avoid discarding points
+    opt_out = loadOptimalParams(paramfile)
+    optimalParams = opt_out[0:3]
+    data[:,2] -= opt_out[3]
+    test[:,2] -= opt_out[3]
+    if len(opt_out)==5:
+        data[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
+        test[N_HIGH_ACCURACY:,3]+=opt_out[4]-0.2
+    with open(covfile,'rb') as fp:
+        iK = pickle.load(fp)
+    performance = np.zeros([ntest,6])
+    print("    Testing %i locations; this may take some time..."%ntest)
+    for i in range(ntest):
+        mu,sig2 = interp(test[i,0],test[i,1],data,iK,optimalParams)
+        performance[i,:] = test[i,0],test[i,1],test[i,2],mu,sig2,(test[i,2]-mu)/sig2**0.5
+    with open(outfile,'wb') as fp:
+        pickle.dump(performance,fp)
+    return performance

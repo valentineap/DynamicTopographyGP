@@ -23,6 +23,19 @@ if not os.path.exists(datafile):
     print(datafile)
     print("Please check and modify 'datafile' in userSettings.py if necessary.")
     sys.exit(1)
+if userSettings.DO_SYNTHETIC:
+    synfile_sampled = os.path.abspath(userSettings.syn_file_sampled)
+    synfile_full = os.path.abspath(userSettings.syn_file_full)
+    if not os.path.exists(synfile_sampled):
+        print("Synthetic dataset not found at")
+        print(synfile_sampled)
+        print("Please check and modify 'syn_file_sampled' in userSettings.py if necessary.")
+        sys.exit(1)
+    if not os.path.exists(synfile_full):
+        print("Synthetic dataset not found at")
+        print(synfile_full)
+        print("Please check and modify 'syn_file_full' in userSettings.py if necessary.")
+        sys.exit(1)
 if userSettings.DO_HIGH_ACCURACY_SPOT:
     print("Analysing high-accuracy spot data")
     subset = 'high_accuracy_spot'
@@ -79,4 +92,19 @@ if userSettings.DO_SPOT_SHIP:
     dynamicTopoGP.calculateMapData(subset,datafile,paramfile,covfile,mapdatafile)
 else:
     print("Analysis of spot and shiptrack data is switched off in userSettings.py")
+if userSettings.DO_SYNTHETIC:
+    print("Analysing synthetic dataset")
+
+    subset = 'high_accuracy_spot' # Only use the first 1160 points in synthetic file
+    outdir = os.path.join(outputdir,'synthetic')
+    if not os.path.exists(outdir): os.mkdir(outdir)
+    paramfile = os.path.join(outdir,'optimal_params.pickle')
+    covfile = os.path.join(outdir,'inverseCov.pickle')
+    perffile = os.path.join(outdir,'performance.pickle')
+
+    #dynamicTopoGP.determineOptimalParams(subset,synfile_sampled,paramfile,True)
+    #dynamicTopoGP.obtainInverse(subset,synfile_sampled,paramfile,covfile)
+    dynamicTopoGP.testPerformance(subset,synfile_sampled,paramfile,covfile,synfile_full,perffile)
+else:
+    print("Analysis of synthetic dataset is switched off in userSettings.py")
 print("Analysis complete.")
