@@ -432,3 +432,40 @@ def testPerformance(dataset_type,datafile,paramfile,covfile,testpointfile,outfil
     with open(outfile,'wb') as fp:
         pickle.dump(performance,fp)
     return performance
+def generateLikelihoodGrids(dataset_type,datafile,paramfile,maxperts,outfile,n=10):
+    data,ndata = loadData(datafile,dataset_type)
+    opt_out = loadOptimalParams(paramfile)
+    nopt_out = len(opt_out)
+    # NB We haven't applied the mean correction here
+    if nopt_out==5:
+        data[N_HIGH_ACCURACY:,3] -= 0.2 # NB: we haven't *added* the optimal correction here
+    dists = np.zeros([ndata,ndata])
+    for i in range(ndata):
+        dists[:,i] = dist(data[i,0],data[i,1],data[:,0],data[:,1])
+    import tqdm
+    with open(outfile,'wb') as fp:
+        for ip,p1 in enumerate(opt_out[:nopt_out-1]):
+            p1steps = p1 + np.linspace(-maxperts[ip],maxperts[ip],1+2*n)
+            for jp,p2 in enumerate(opt_out[ip+1:]):
+                jp+=ip+1
+                p2steps = p2 + np.linspace(-maxperts[jp],maxperts[jp],1+2*n)
+                print(ip,jp,p1steps,p2steps)
+                pp1 = np.zeros([1+2*n,1+2*n])
+                pp2 = np.zeros([1+2*n,1+2*n])
+                loglike = np.zeros([1+2*n,1+2*n])
+                t = tqdm.tqdm(total = (1+2*n)**2)
+                for i,x in enumerate(p1steps):
+                    for j,y in enumerate(p2steps):
+                        pp1[i,j] = x
+                        pp2[i,j] = y
+                        opt_pert = opt_out.copy()
+                        opt_pert[ip] = x
+                        opt_pert[jp] = y
+                        if nopt_out == 4:
+                            loglike[i,j] = logLikelihood(dists,data[:,2]-opt_pert[3],data[:,3],opt_pert[0:3])
+                        else:
+                            loglike[i,j] = logLikelihood(dists,data[:,2]-opt_pert[3],data[:,3]+opt_pert[4],opt_pert[0:3])
+                        t.update(1)
+                pickle.dump(pp1,fp)
+                pickle.dump(pp2,fp)
+                pickle.dump(loglike,fp)
