@@ -99,19 +99,13 @@ if userSettings.DO_SYNTHETIC:
 
     subset = 'high_accuracy_spot' # Only use the first 1160 points in synthetic file
     outdir = os.path.join(outputdir,'synthetic')
-    subsetdir = os.path.join(outputdir,subset)
     if not os.path.exists(outdir): os.mkdir(outdir)
-    paramfile = os.path.join(subsetdir,'optimal_params.pickle')
-    covfile = os.path.join(subsetdir,'inverseCov.pickle')
+    paramfile = os.path.join(outdir,'optimal_params.pickle')
+    covfile = os.path.join(outdir,'inverseCov.pickle')
     perffile = os.path.join(outdir,'performance.pickle')
-    if not os.path.exists(paramfile):
-        print("File not found: %s"%paramfile)
-        print("Analysis for %s subset must be run before attempting synthetic test."%subset)
-        sys.exit(1)
-    if not os.path.exists(covfile):
-        print("File not found: %s"%covfile)
-        print("Analysis for %s subset must be run before attempting synthetic test."%subset)
-        sys.exit(1)
+
+    #dynamicTopoGP.determineOptimalParams(subset,synfile_sampled,paramfile,True)
+    #dynamicTopoGP.obtainInverse(subset,synfile_sampled,paramfile,covfile)
     dynamicTopoGP.testPerformance(subset,synfile_sampled,paramfile,covfile,synfile_full,perffile)
 else:
     print("Analysis of synthetic dataset is switched off in userSettings.py")
