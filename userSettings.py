@@ -17,7 +17,7 @@ outputdir = '.'
 DO_HIGH_ACCURACY_SPOT = True
 
 # Run analysis for the subset of all 2030 spot points?
-DO_ALL_SPOT = False
+DO_ALL_SPOT = True
 
 # Run analysis for complete database?
 # N.B. This requires significant computational resources
@@ -27,7 +27,7 @@ DO_ALL_SPOT = False
 DO_SPOT_SHIP = False
 
 # Generate data for hyperparameter tradeoff analysis? (Slow! Uses 'all spot' dataset)
-DO_TRADEOFF_ANALYSIS = True
+DO_TRADEOFF_ANALYSIS = False
 
 # Test predictive performance against a synthetic dataset?
 DO_SYNTHETIC = False
@@ -35,8 +35,19 @@ DO_SYNTHETIC = False
 # a 'high-accuracy' dataset, i.e. only first 1160 points used)
 syn_file_sampled = './Davies_etal_NGeo_2019_Datasets/models/with_shallow_structure/with_shallow_structure_spot.dat'
 # Data file against which to test predictive performance
-syn_file_full = './Davies_etal_NGeo_2019_Datasets/models/with_shallow_structure/with_shallow_structure_oceans.dat' #'./Davies_etal_NGeo_2019_Datasets/models/with_shallow_structure/with_shallow_structure_full.dat'
+syn_file_full = './Davies_etal_NGeo_2019_Datasets/models/with_shallow_structure/with_shallow_structure_oceans.dat'
 
+# Which figures should be generated? List of figure numbers. Note that this selection
+# may not be fully honoured: figs 6 & 7 cannot be generated independently, and
+# setting TABLE_DATA = True below will force generation of Figs. 2, 6 & 7.
+FIGURES = [1,2,3,4,5,6,7,8,9,10,11]
+
+# During figure generation, should the information presented in tables within
+# the paper also be calculated and displayed? (may be slow)
+TABLE_DATA = False
+
+# Generate the data files provided as 'supplementary material'?
+SUPPLEMENTARY_DATA = False
 
 #How many random samples should be used for computing statistics? (Larger = slower)
 N_RANDOM_SAMPLES = 100000
@@ -44,19 +55,7 @@ N_RANDOM_SAMPLES = 100000
 # Should maps be plotted with continuous or quantised colour scales?
 CONTINUOUS_COLOURSCALES = False
 
-# Which figures should be generated? List of figure numbers. Note that this selection
-# may not be fully honoured: figs 6 & 7 cannot be generated independently, and
-# setting TABLE_DATA = True below will force generation of Figs. 2, 6 & 7.
-FIGURES = [1,2,3,4,5,6,7,8,9,10,11]
-
 # When generating figures, should plt.show() be called?
 # Note that this may cause the interpreter to block and
 # wait for the figure to be closed
 PLT_SHOW = False
-
-# During figure generation, should the information presented in tables within
-# the paper also be calculated and displayed? (may be slow)
-TABLE_DATA = False
-
-# Generate the data files provided as 'supplementary material'?
-SUPPLEMENTARY_DATA = True
