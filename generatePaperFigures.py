@@ -717,7 +717,7 @@ if __name__ == '__main__':
             plotPerformance(synth('performance.pickle'),figpath('performance.pdf'))
             print("Figure 8 complete; file saved at %s\n"%figpath('performance.pdf'))
         except FileNotFoundError:
-            print("Unable to find necessary data files. Skipping...")
+            print("Unable to find necessary data files. Skipping...\n")
     if toggleFigure(9):
         try:
             # Tradeoff plots
@@ -725,7 +725,7 @@ if __name__ == '__main__':
             plotHyperparameterTradeoffs('all_spot',all_spot('likelihood.pickle'),figpath('hyper_tradeoff.pdf'))
             print("Figure 9 complete; file saved at %s\n"%figpath('hyper_tradeoff.pdf'))
         except FileNotFoundError:
-            print("Unable to find necessary data file. Skipping...")
+            print("Unable to find necessary data file. Skipping...\n")
     if toggleFigure(10):
         try:
             # Map of where to sample -- Fig. 10
@@ -733,7 +733,7 @@ if __name__ == '__main__':
             plotWhereToSample(ha_spot('mapdata.pickle'),ha_spot('sampling_%i.pickle'),figpath('wheretosample.pdf'))
             print("Figure 10 complete; file saved at %s\n"%figpath('wheretosample.pdf'))
         except FileNotFoundError:
-            print("Unable to find necessary data files. Skipping...")
+            print("Unable to find necessary data files. Skipping...\n")
     if toggleFigure(11):
         print("Making figure 11: Map of low-degree residual topography")
         plotLowDegrees(ha_spot('sphcoeff.pickle'),all_spot('sphcoeff.pickle'),spot_ship('sphcoeff.pickle'),figpath('1to3.pdf'))
