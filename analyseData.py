@@ -65,6 +65,7 @@ if userSettings.DO_ALL_SPOT:
     covfile = os.path.join(outdir,'inverseCov.pickle')
     specfile = os.path.join(outdir,'sphcoeff.pickle')
     mapdatafile = os.path.join(outdir,'mapdata.pickle')
+    tradeofffile = os.path.join(outdir,'likelihood.pickle')
     samplemask = os.path.join(outdir,'sampling_%i.pickle')
 
 
@@ -72,6 +73,7 @@ if userSettings.DO_ALL_SPOT:
     dynamicTopoGP.obtainInverse(subset,datafile,paramfile,covfile)
     dynamicTopoGP.obtainSpectrum(subset,datafile,paramfile,specfile,Lmax)
     dynamicTopoGP.calculateMapData(subset,datafile,paramfile,covfile,mapdatafile)
+    if userSettings.DO_TRADEOFF_ANALYSIS: dynamicTopoGP.generateLikelihoodGrids(subset,datafile,paramfile,[.05,.05,.05,.3,.08],tradeofffile)
 else:
     print("Analysis of all spot data is switched off in userSettings.py")
 if userSettings.DO_SPOT_SHIP:

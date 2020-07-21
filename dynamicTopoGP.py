@@ -412,6 +412,17 @@ def calculateWhereToSample(dataset_type,datafile,paramfile,covfile,sphfile,mapda
             pickle.dump(dkl_min,fp)
             pickle.dump(dkl,fp)
 def testPerformance(dataset_type,datafile,paramfile,covfile,testpointfile,outfile):
+    '''
+    Evaluate predictive performance against a second dataset.
+
+    Inputs:
+    dataset_type - str, "high_accuracy_spot","all_spot" or "spot_shiptrack"
+    datafile - Path to residual topography dataset
+    paramfile - File containing hyperparameters
+    covfile - File containing inverse covariance matrix
+    testpointfile - Path to file in same format as residual topography dataset, containing 'ground truth' data
+    outfile -
+    '''
     print("- Evaluating predictions against known dataset")
     data,ndata = loadData(datafile,dataset_type)
     test,ntest = loadData(testpointfile,'spot_shiptrack') # Load as 'spot_shiptrack' to avoid discarding points
@@ -433,6 +444,7 @@ def testPerformance(dataset_type,datafile,paramfile,covfile,testpointfile,outfil
         pickle.dump(performance,fp)
     return performance
 def generateLikelihoodGrids(dataset_type,datafile,paramfile,maxperts,outfile,n=10):
+    print("- Generating hyperparameter tradeoff grids; this may take some time...")
     data,ndata = loadData(datafile,dataset_type)
     opt_out = loadOptimalParams(paramfile)
     nopt_out = len(opt_out)
@@ -442,18 +454,16 @@ def generateLikelihoodGrids(dataset_type,datafile,paramfile,maxperts,outfile,n=1
     dists = np.zeros([ndata,ndata])
     for i in range(ndata):
         dists[:,i] = dist(data[i,0],data[i,1],data[:,0],data[:,1])
-    import tqdm
     with open(outfile,'wb') as fp:
         for ip,p1 in enumerate(opt_out[:nopt_out-1]):
             p1steps = p1 + np.linspace(-maxperts[ip],maxperts[ip],1+2*n)
             for jp,p2 in enumerate(opt_out[ip+1:]):
                 jp+=ip+1
                 p2steps = p2 + np.linspace(-maxperts[jp],maxperts[jp],1+2*n)
-                print(ip,jp,p1steps,p2steps)
+                #print(ip,jp,p1steps,p2steps)
                 pp1 = np.zeros([1+2*n,1+2*n])
                 pp2 = np.zeros([1+2*n,1+2*n])
                 loglike = np.zeros([1+2*n,1+2*n])
-                t = tqdm.tqdm(total = (1+2*n)**2)
                 for i,x in enumerate(p1steps):
                     for j,y in enumerate(p2steps):
                         pp1[i,j] = x
@@ -464,8 +474,7 @@ def generateLikelihoodGrids(dataset_type,datafile,paramfile,maxperts,outfile,n=1
                         if nopt_out == 4:
                             loglike[i,j] = logLikelihood(dists,data[:,2]-opt_pert[3],data[:,3],opt_pert[0:3])
                         else:
-                            loglike[i,j] = logLikelihood(dists,data[:,2]-opt_pert[3],data[:,3]+opt_pert[4],opt_pert[0:3])
-                        t.update(1)
+                            loglike[i,j] = logLikelihood(dists,data[:,2]-opt_pert[3],np.where(np.arange(data.shape[0])<N_HIGH_ACCURACY,data[:,3],data[:,3]+opt_pert[4]),opt_pert[0:3])
                 pickle.dump(pp1,fp)
                 pickle.dump(pp2,fp)
                 pickle.dump(loglike,fp)

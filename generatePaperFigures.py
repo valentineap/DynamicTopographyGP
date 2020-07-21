@@ -582,6 +582,47 @@ def plotPerformance(perffile,outfile):
     plt.tight_layout()
     plt.savefig(outfile)
     if SHOWFIGS:plt.show()
+def plotHyperparameterTradeoffs(dataset_type,likelihoodfile,outfile):
+    plt.rcParams['font.size']=12
+    labels = [r"$\sigma_1$",r"$\sigma_2$",r"$\nu$",r"$\mu_0$",r"$\Delta$"]
+    ticks = [[0.60,0.65],[0.2,0.25],[0.45,0.50],[-.2,0,.2],[0.02,0.08,0.14]]
+    if dataset_type == 'high_accuracy_spot':
+        npar = 4
+    elif dataset_type == 'all_spot':
+        npar = 5
+    else:
+        raise ValueError("Unrecognised dataset type")
+    with open(likelihoodfile,'rb') as fp:
+        fig = plt.figure(figsize=(8,8))
+        for i in range(npar-1):
+            for j in range(i+1,npar):
+                pp1 = pickle.load(fp)
+                pp2 = pickle.load(fp)
+                like = pickle.load(fp)
+                n = int((pp1.shape[0]-1)/2)
+                ax = fig.add_subplot(npar-1,npar-1,(i+1)+(npar-1)*(j-1))
+                sc = ax.contourf(pp1,pp2,np.exp(like - like[n,n]),14,cmap=plt.cm.cubehelix)
+                for c in sc.collections:
+                    c.set_edgecolor('face')
+                sc.set_clim(0,1)
+                ax.set_xticks(ticks[i])
+                ax.set_yticks(ticks[j])
+                if j==npar-1:
+                    ax.set_xlabel(labels[i])
+                else:
+                    ax.set_xticklabels([])
+                if i==0:
+                    ax.set_ylabel(labels[j])
+                else:
+                    ax.set_yticklabels([])
+    ax = fig.add_subplot(npar-1,npar-1,npar-1)
+    ax.axis('off')
+    cb = plt.colorbar(sc,ax=ax,fraction=0.5,aspect=10,label=r"$\propto \mathbb{P}(\sigma\,|\,\hat{d})$",ticks=[0,0.5,1.0])
+    cb.ax.yaxis.set_label_position('left')
+    plt.tight_layout()
+    plt.savefig(outfile)
+    if SHOWFIGS: plt.show()
+
 
 
 if __name__ == '__main__':
@@ -679,16 +720,24 @@ if __name__ == '__main__':
             print("Unable to find necessary data files. Skipping...")
     if toggleFigure(9):
         try:
-            # Map of where to sample -- Fig. 9
-            print("Making figure 9: Map of value of one additional sample")
+            # Tradeoff plots
+            print("Making figure 9: Hyperparameter tradeoffs")
+            plotHyperparameterTradeoffs('all_spot',all_spot('likelihood.pickle'),figpath('hyper_tradeoff.pdf'))
+            print("Figure 9 complete; file saved at %s\n"%figpath('hyper_tradeoff.pdf'))
+        except FileNotFoundError:
+            print("Unable to find necessary data file. Skipping...")
+    if toggleFigure(10):
+        try:
+            # Map of where to sample -- Fig. 10
+            print("Making figure 10: Map of value of one additional sample")
             plotWhereToSample(ha_spot('mapdata.pickle'),ha_spot('sampling_%i.pickle'),figpath('wheretosample.pdf'))
-            print("Figure 9 complete; file saved at %s\n"%figpath('wheretosample.pdf'))
+            print("Figure 10 complete; file saved at %s\n"%figpath('wheretosample.pdf'))
         except FileNotFoundError:
             print("Unable to find necessary data files. Skipping...")
-    if toggleFigure(10):
-        print("Making figure 10: Map of low-degree residual topography")
+    if toggleFigure(11):
+        print("Making figure 11: Map of low-degree residual topography")
         plotLowDegrees(ha_spot('sphcoeff.pickle'),all_spot('sphcoeff.pickle'),spot_ship('sphcoeff.pickle'),figpath('1to3.pdf'))
-        print("Figure 10 complete; file saved at %s\n"%figpath('1to3.pdf'))
+        print("Figure 11 complete; file saved at %s\n"%figpath('1to3.pdf'))
     print("All figures generated.")
     if userSettings.SUPPLEMENTARY_DATA:
         print("Generating supplementary data files ")
