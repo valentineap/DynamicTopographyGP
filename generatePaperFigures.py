@@ -601,7 +601,7 @@ def plotHyperparameterTradeoffs(dataset_type,likelihoodfile,outfile):
                 like = pickle.load(fp)
                 n = int((pp1.shape[0]-1)/2)
                 ax = fig.add_subplot(npar-1,npar-1,(i+1)+(npar-1)*(j-1))
-                sc = ax.contourf(pp1,pp2,np.exp(like - like[n,n]),14,cmap=plt.cm.cubehelix)
+                sc = ax.contourf(pp1,pp2,np.exp(like - like[n,n]),100,cmap=plt.cm.cubehelix)
                 for c in sc.collections:
                     c.set_edgecolor('face')
                 sc.set_clim(0,1)
@@ -619,6 +619,7 @@ def plotHyperparameterTradeoffs(dataset_type,likelihoodfile,outfile):
     ax.axis('off')
     cb = plt.colorbar(sc,ax=ax,fraction=0.5,aspect=10,label=r"$\propto \mathbb{P}(\sigma\,|\,\hat{d})$",ticks=[0,0.5,1.0])
     cb.ax.yaxis.set_label_position('left')
+    cb.ax.set_ylim(0,1)
     plt.tight_layout()
     plt.savefig(outfile)
     if SHOWFIGS: plt.show()
