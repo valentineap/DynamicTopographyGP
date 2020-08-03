@@ -3,7 +3,8 @@
 This repository implements the analysis described in:
 
 Valentine, A.P. and D.R. Davies, in press. Global Models from Sparse Data: A
-Robust Estimate of Earth's Residual Topography Spectrum. _Geochemistry, Geophysics, Geosystems_.
+Robust Estimate of Earth's Residual Topography Spectrum. _Geochemistry, Geophysics, Geosystems_,
+[doi:10.1029/2020GC009240](https://doi.org/10.1029/2020GC009240).
 
 A preprint of this paper [is available here](https://doi.org/10.1002/essoar.10503393.2).
 
