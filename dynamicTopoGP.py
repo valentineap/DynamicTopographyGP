@@ -16,7 +16,6 @@ import datetime
 ########################################
 
 
-datafile_path = '../Davies_etal_NGeo_2019_Datasets/hoggard/spot_shiptrack.dat'
 N_HIGH_ACCURACY = 1160 # Number of 'high-accuracy' spot measurements at the start of Hoggard's datafile
 N_SPOT = 2030 # Next 870 points are 'low-accuracy' spot
 
